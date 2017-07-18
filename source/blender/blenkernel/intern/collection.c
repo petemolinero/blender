@@ -40,6 +40,7 @@
 #include "BKE_main.h"
 #include "BKE_scene.h"
 
+#include "DNA_group_types.h"
 #include "DNA_ID.h"
 #include "DNA_layer_types.h"
 #include "DNA_object_types.h"
@@ -47,14 +48,26 @@
 
 #include "MEM_guardedalloc.h"
 
+static SceneCollection *collection_master_from_id(const ID *id)
+{
+	switch (GS(id->name)) {
+		case ID_SCE:
+			return ((Scene *)id)->collection;
+		case ID_GR:
+			return ((Group *)id)->collection;
+		default:
+			BLI_assert(!"ID doesn't support collections");
+			return NULL;
+	}
+}
 
 /**
  * Add a collection to a collection ListBase and syncronize all render layers
  * The ListBase is NULL when the collection is to be added to the master collection
  */
-SceneCollection *BKE_collection_add(Scene *scene, SceneCollection *sc_parent, const char *name)
+SceneCollection *BKE_collection_add(ID *id, SceneCollection *sc_parent, const char *name)
 {
-	SceneCollection *sc_master = BKE_collection_master(scene);
+	SceneCollection *sc_master = collection_master_from_id(id);
 	SceneCollection *sc = MEM_callocN(sizeof(SceneCollection), "New Collection");
 
 	if (!name) {
@@ -65,10 +78,10 @@ SceneCollection *BKE_collection_add(Scene *scene, SceneCollection *sc_parent, co
 		sc_parent = sc_master;
 	}
 
-	BKE_collection_rename(scene, sc, name);
+	BKE_collection_rename((Scene *)id, sc, name);
 	BLI_addtail(&sc_parent->scene_collections, sc);
 
-	BKE_layer_sync_new_scene_collection(scene, sc_parent, sc);
+	BKE_layer_sync_new_scene_collection(id, sc_parent, sc);
 	return sc;
 }
 
@@ -182,6 +195,14 @@ SceneCollection *BKE_collection_master(const Scene *scene)
 	return scene->collection;
 }
 
+/**
+ * Returns the master collection of the group
+ */
+SceneCollection *BKE_collection_group_master(const Group *group)
+{
+	return group->collection;
+}
+
 struct UniqueNameCheckData {
 	ListBase *lb;
 	SceneCollection *lookup_sc;
@@ -207,13 +228,18 @@ static bool collection_unique_name_check(void *arg, const char *name)
 	return false;
 }
 
-void BKE_collection_rename(const Scene *scene, SceneCollection *sc, const char *name)
+static void collection_rename(const ID *id, SceneCollection *sc, const char *name)
 {
-	SceneCollection *sc_master = BKE_collection_master(scene);
+	SceneCollection *sc_master = collection_master_from_id(id);
 	struct UniqueNameCheckData data = {.lb = &sc_master->scene_collections, .lookup_sc = sc};
 
 	BLI_strncpy(sc->name, name, sizeof(sc->name));
 	BLI_uniquename_cb(collection_unique_name_check, &data, DATA_("Collection"), '.', sc->name, sizeof(sc->name));
+}
+
+void BKE_collection_rename(const Scene *scene, SceneCollection *sc, const char *name)
+{
+	collection_rename(&scene->id, sc, name);
 }
 
 /**
@@ -225,23 +251,36 @@ void BKE_collection_master_free(Scene *scene, const bool do_id_user)
 	collection_free(BKE_collection_master(scene), do_id_user);
 }
 
-static void collection_object_add(const Scene *scene, SceneCollection *sc, Object *ob)
+void BKE_collection_master_group_free(Group *group)
+{
+	collection_free(BKE_collection_group_master(group), false);
+}
+
+static void collection_object_add(const ID *id, SceneCollection *sc, Object *ob)
 {
 	BLI_addtail(&sc->objects, BLI_genericNodeN(ob));
-	id_us_plus((ID *)ob);
-	BKE_layer_sync_object_link(scene, sc, ob);
+
+	if (GS(id->name) == ID_SCE) {
+		id_us_plus((ID *)ob);
+	}
+	else {
+		BLI_assert(GS(id->name) == ID_GR);
+	}
+
+	BKE_layer_sync_object_link(id, sc, ob);
 }
 
 /**
  * Add object to collection
  */
-void BKE_collection_object_add(const Scene *scene, SceneCollection *sc, Object *ob)
+void BKE_collection_object_add(const ID *id, SceneCollection *sc, Object *ob)
 {
 	if (BLI_findptr(&sc->objects, ob, offsetof(LinkData, data))) {
 		/* don't add the same object twice */
 		return;
 	}
-	collection_object_add(scene, sc, ob);
+
+	collection_object_add(id, sc, ob);
 }
 
 /**
@@ -253,7 +292,7 @@ void BKE_collection_object_add_from(Scene *scene, Object *ob_src, Object *ob_dst
 	FOREACH_SCENE_COLLECTION(scene, sc)
 	{
 		if (BLI_findptr(&sc->objects, ob_src, offsetof(LinkData, data))) {
-			collection_object_add(scene, sc, ob_dst);
+			collection_object_add(&scene->id, sc, ob_dst);
 		}
 	}
 	FOREACH_SCENE_COLLECTION_END
@@ -287,7 +326,7 @@ void BKE_collection_object_remove(Main *bmain, const Scene *scene, SceneCollecti
 	MEM_freeN(link);
 
 	TODO_LAYER_SYNC_FILTER; /* need to remove all instances of ob in scene collections -> filter_objects */
-	BKE_layer_sync_object_unlink(scene, sc, ob);
+	BKE_layer_sync_object_unlink(&scene->id, sc, ob);
 
 	if (free_us) {
 		BKE_libblock_free_us(bmain, ob);
@@ -302,7 +341,7 @@ void BKE_collection_object_remove(Main *bmain, const Scene *scene, SceneCollecti
  */
 void BKE_collection_object_move(const Scene *scene, SceneCollection *sc_dst, SceneCollection *sc_src, Object *ob)
 {
-	BKE_collection_object_add(scene, sc_dst, ob);
+	BKE_collection_object_add(&scene->id, sc_dst, ob);
 	BKE_collection_object_remove(NULL, scene, sc_src, ob, false);
 }
 

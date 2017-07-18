@@ -1369,7 +1369,7 @@ static int make_links_scene_exec(bContext *C, wmOperator *op)
 	SceneCollection *sc_to = BKE_collection_master(scene_to);
 	CTX_DATA_BEGIN (C, Base *, base, selected_bases)
 	{
-		BKE_collection_object_add(scene_to, sc_to, base->object);
+		BKE_collection_object_add(&scene_to->id, sc_to, base->object);
 	}
 	CTX_DATA_END;
 
@@ -2142,7 +2142,7 @@ static bool make_local_all__instance_indirect_unused(Main *bmain, Scene *scene, 
 
 			id_us_plus(&ob->id);
 
-			BKE_collection_object_add(scene, sc, ob);
+			BKE_collection_object_add(&scene->id, sc, ob);
 			base = BKE_scene_layer_base_find(sl, ob);
 			base->flag |= BASE_SELECTED;
 			BKE_scene_object_base_flag_sync_from_base(base);

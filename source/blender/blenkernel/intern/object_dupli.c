@@ -281,13 +281,12 @@ static void make_child_duplis(const DupliContext *ctx, void *userdata, MakeChild
 /* OB_DUPLIGROUP */
 static void make_duplis_group(const DupliContext *ctx)
 {
-	bool for_render = (ctx->eval_ctx->mode == DAG_EVAL_RENDER);
 	Object *ob = ctx->object;
 	Group *group;
-	GroupObject *go;
+	Base *base;
 	float group_mat[4][4];
 	int id;
-	bool animated, hide;
+	bool animated;
 
 	if (ob->dup_group == NULL) return;
 	group = ob->dup_group;
@@ -309,34 +308,17 @@ static void make_duplis_group(const DupliContext *ctx)
 
 	animated = BKE_group_is_animated(group, ob);
 
-	for (go = group->gobject.first, id = 0; go; go = go->next, id++) {
-		/* note, if you check on layer here, render goes wrong... it still deforms verts and uses parent imat */
-		if (go->ob != ob) {
+	for (base = group->scene_layer->object_bases.first, id = 0; base; base = base->next, id++) {
+		if (base->object != ob && (base->flag & BASE_VISIBLED)) {
 			float mat[4][4];
 
-			/* Special case for instancing dupli-groups, see: T40051
-			 * this object may be instanced via dupli-verts/faces, in this case we don't want to render
-			 * (blender convention), but _do_ show in the viewport.
-			 *
-			 * Regular objects work fine but not if we're instancing dupli-groups,
-			 * because the rules for rendering aren't applied to objects they instance.
-			 * We could recursively pass down the 'hide' flag instead, but that seems unnecessary.
-			 */
-			if (for_render && go->ob->parent && go->ob->parent->transflag & (OB_DUPLIVERTS | OB_DUPLIFACES)) {
-				continue;
-			}
-
 			/* group dupli offset, should apply after everything else */
-			mul_m4_m4m4(mat, group_mat, go->ob->obmat);
+			mul_m4_m4m4(mat, group_mat, base->object->obmat);
 
-			/* check the group instance and object layers match, also that the object visible flags are ok. */
-			hide = (go->ob->lay & group->layer) == 0 ||
-			       (for_render ? go->ob->restrictflag & OB_RESTRICT_RENDER : go->ob->restrictflag & OB_RESTRICT_VIEW);
-
-			make_dupli(ctx, go->ob, mat, id, animated, hide);
+			make_dupli(ctx, base->object, mat, id, animated, false);
 
 			/* recursion */
-			make_recursive_duplis(ctx, go->ob, group_mat, id, animated);
+			make_recursive_duplis(ctx, base->object, group_mat, id, animated);
 		}
 	}
 }

@@ -2588,6 +2588,16 @@ static void write_layer_collections(WriteData *wd, ListBase *lb)
 	}
 }
 
+static void write_scene_layer(WriteData *wd, SceneLayer *sl)
+{
+	writestruct(wd, DATA, SceneLayer, 1, sl);
+	writelist(wd, DATA, Base, &sl->object_bases);
+	if (sl->properties) {
+		IDP_WriteProperty(sl->properties, wd);
+	}
+	write_layer_collections(wd, &sl->layer_collections);
+}
+
 static void write_scene(WriteData *wd, Scene *sce)
 {
 	/* write LibData */
@@ -2785,12 +2795,7 @@ static void write_scene(WriteData *wd, Scene *sce)
 	write_scene_collection(wd, sce->collection);
 
 	for (SceneLayer *sl = sce->render_layers.first; sl; sl = sl->next) {
-		writestruct(wd, DATA, SceneLayer, 1, sl);
-		writelist(wd, DATA, Base, &sl->object_bases);
-		if (sl->properties) {
-			IDP_WriteProperty(sl->properties, wd);
-		}
-		write_layer_collections(wd, &sl->layer_collections);
+		write_scene_layer(wd, sl);
 	}
 
 	if (sce->layer_properties) {
@@ -3216,6 +3221,8 @@ static void write_group(WriteData *wd, Group *group)
 		write_iddata(wd, &group->id);
 
 		write_previews(wd, group->preview);
+		write_scene_collection(wd, group->collection);
+		write_scene_layer(wd, group->scene_layer);
 
 		for (GroupObject *go = group->gobject.first; go; go = go->next) {
 			writestruct(wd, DATA, GroupObject, 1, go);

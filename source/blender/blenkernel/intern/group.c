@@ -45,9 +45,11 @@
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
 
+#include "BKE_collection.h"
 #include "BKE_global.h"
 #include "BKE_group.h"
 #include "BKE_icons.h"
+#include "BKE_layer.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_object.h"
@@ -71,6 +73,36 @@ void BKE_group_free(Group *group)
 	}
 
 	BKE_previewimg_free(&group->preview);
+
+	if (group->scene_layer != NULL) {
+		BKE_scene_layer_free(group->scene_layer);
+		group->scene_layer = NULL;
+	}
+
+	if (group->collection != NULL) {
+		BKE_collection_master_group_free(group);
+		MEM_freeN(group->collection);
+		group->collection = NULL;
+	}
+}
+
+/**
+ * Run when adding new groups or during doversion.
+ */
+void BKE_group_init(Group *group)
+{
+	group->collection = MEM_callocN(sizeof(SceneCollection), __func__);
+	BLI_strncpy(group->collection->name, "Master Collection", sizeof(group->collection->name));
+	group->scene_layer = NULL; /* groups are not calloced. */
+	group->scene_layer = BKE_scene_layer_group_add(group);
+
+	/* Unlink the master collection. */
+	BKE_collection_unlink(group->scene_layer, group->scene_layer->layer_collections.first);
+
+	/* Create and link a new default collection. */
+	SceneCollection *defaut_collection = BKE_collection_add(&group->id, NULL, "Default Collection");
+	BKE_collection_link(group->scene_layer, defaut_collection);
+
 }
 
 Group *BKE_group_add(Main *bmain, const char *name)
@@ -83,7 +115,7 @@ Group *BKE_group_add(Main *bmain, const char *name)
 	group->layer = (1 << 20) - 1;
 
 	group->preview = NULL;
-
+	BKE_group_init(group);
 	return group;
 }
 

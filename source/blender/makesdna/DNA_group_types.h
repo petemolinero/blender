@@ -60,6 +60,10 @@ typedef struct Group {
 	 * on the last used scene */
 	unsigned int layer;
 	float dupli_ofs[3];
+
+	struct SceneCollection *collection;
+	struct SceneLayer *scene_layer;
+	ListBase layer_collections; /* LayerCollection */
 } Group;
 
 #endif  /* __DNA_GROUP_TYPES_H__ */

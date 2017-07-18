@@ -48,6 +48,7 @@ struct ListBase;
 struct Main;
 struct Object;
 struct Base;
+struct Group;
 struct RenderEngine;
 struct Scene;
 struct SceneCollection;
@@ -59,6 +60,7 @@ void BKE_layer_exit(void);
 struct SceneLayer *BKE_scene_layer_from_scene_get(const struct Scene *scene);
 struct SceneLayer *BKE_scene_layer_from_workspace_get(const struct Scene *scene, const struct WorkSpace *workspace);
 struct SceneLayer *BKE_scene_layer_add(struct Scene *scene, const char *name);
+struct SceneLayer *BKE_scene_layer_group_add(struct Group *group);
 
 /* DEPRECATED */
 struct SceneLayer *BKE_scene_layer_context_active_PLACEHOLDER(const struct Scene *scene);
@@ -100,9 +102,9 @@ bool BKE_scene_has_object(struct Scene *scene, struct Object *ob);
 
 /* syncing */
 
-void BKE_layer_sync_new_scene_collection(struct Scene *scene, const struct SceneCollection *sc_parent, struct SceneCollection *sc);
-void BKE_layer_sync_object_link(const struct Scene *scene, struct SceneCollection *sc, struct Object *ob);
-void BKE_layer_sync_object_unlink(const struct Scene *scene, struct SceneCollection *sc, struct Object *ob);
+void BKE_layer_sync_new_scene_collection(struct ID *id, const struct SceneCollection *sc_parent, struct SceneCollection *sc);
+void BKE_layer_sync_object_link(const struct ID *id, struct SceneCollection *sc, struct Object *ob);
+void BKE_layer_sync_object_unlink(const struct ID *id, struct SceneCollection *sc, struct Object *ob);
 
 /* override */
 

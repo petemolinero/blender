@@ -784,9 +784,11 @@ static eOLDrawState tree_element_active_collection(
 		LayerCollection *lc = te->directdata;
 		const int collection_index = BKE_layer_collection_findindex(sl, lc);
 
-		BLI_assert(collection_index >= 0);
-		sl->active_collection = collection_index;
-		WM_main_add_notifier(NC_SCENE | ND_LAYER, NULL);
+		/* If the collection is part of a group we don't change active collection. */
+		if (collection_index > -1) {
+			sl->active_collection = collection_index;
+			WM_main_add_notifier(NC_SCENE | ND_LAYER, NULL);
+		}
 	}
 
 	return OL_DRAWSEL_NONE;
